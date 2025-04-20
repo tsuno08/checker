@@ -1,82 +1,113 @@
-// 設定管理
-const getConfig = () => {
-  const props = PropertiesService.getScriptProperties();
-  return {
-    email: props.getProperty('EMAIL_RECIPIENT') || 'your-email@example.com',
-    spreadsheetId: props.getProperty('SPREADSHEET_ID') || '',
-  };
+import { GoogleGenAI } from '@google/genai';
+
+// ハッシュ計算
+const calculateHash = (content: string): string => {
+  const digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    content,
+    Utilities.Charset.UTF_8
+  );
+  return digest.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// コンテンツ取得
-const fetchContent = (url: string): string => {
-  const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  return response.getContentText();
+// Gemini APIで解析
+const analyzeWithGemini = async (
+  oldContent: string,
+  newContent: string
+): Promise<string> => {
+  try {
+    const apiKey =
+      PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+    if (!apiKey) throw new Error('GEMINI_API_KEYが設定されていません');
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: `以下の差分を日本語で簡潔に要約してください:\n\n### 変更前${oldContent}\n\n### 変更後${newContent}`,
+    });
+    return response.text || '解析できませんでした';
+  } catch (e) {
+    console.error('Gemini API解析エラー:', e);
+    return `解析エラー: ${(e as Error).message}`;
+  }
 };
 
 // 変更比較
-const compareContent = (url: string, newContent: string): boolean => {
+const compareContent = async (
+  url: string,
+  newContent: string
+): Promise<{ changed: boolean; analysis?: string }> => {
   const props = PropertiesService.getScriptProperties();
-  const key = `last_content_${encodeURIComponent(url)}`;
-  const lastContent = props.getProperty(key);
+  const hashKey = `last_hash_${encodeURIComponent(url)}`;
+  const contentKey = `last_content_${encodeURIComponent(url)}`;
 
-  if (lastContent !== newContent) {
-    props.setProperty(key, newContent);
-    return !!lastContent; // 初回はfalse、更新時はtrue
+  const newHash = calculateHash(newContent);
+  const lastHash = props.getProperty(hashKey);
+  const lastContent = props.getProperty(contentKey);
+
+  if (lastHash !== newHash) {
+    props.setProperty(hashKey, newHash);
+    props.setProperty(contentKey, newContent);
+
+    if (lastHash) {
+      const analysis = await analyzeWithGemini(lastContent || '', newContent);
+      return { changed: true, analysis };
+    }
+    return { changed: false };
   }
-  return false;
+  return { changed: false };
 };
 
 // 通知送信
-const sendNotification = (url: string, changes: string): void => {
-  const { email } = getConfig();
+const sendNotification = (
+  url: string,
+  changes: string,
+  analysis: string
+): void => {
+  const email =
+    PropertiesService.getScriptProperties().getProperty('EMAIL_RECIPIENT');
+  if (!email) {
+    throw new Error('EMAIL_RECIPIENTが設定されていません');
+  }
   MailApp.sendEmail({
     to: email,
-    subject: `更新あり: ${url}`,
-    htmlBody: `以下の変更を検出しました:<br><br>${changes}`,
+    subject: `更新検出: ${url}`,
+    htmlBody: `
+      <h2>更新が検出されました</h2>
+      <p><strong>URL:</strong> ${url}</p>
+      <h3>変更分析:</h3>
+      <p>${analysis.replace(/\n/g, '<br>')}</p>
+      <h3>詳細:</h3>
+      <div style="white-space: pre-wrap">${changes}</div>
+    `,
   });
 };
 
-// サイトごとのパーサー
-const parsers: Record<string, (content: string) => string> = {
-  'https://windsurf.com/changelog': content =>
-    content.match(/<div class="changelog">([\s\S]*?)<\/div>/)?.[1] || '',
+const URLS = [
+  'https://windsurf.com/changelog',
+  'https://www.cursor.com/ja/changelog',
+  'https://github.blog/changelog/label/copilot/',
+  'https://github.com/RooVetGit/Roo-Code/releases',
+  'https://github.com/cline/cline/releases',
+];
 
-  'https://www.cursor.com/ja/changelog': content => {
-    const jaContent =
-      content.match(/<div id="ja-content">([\s\S]*?)<\/div>/)?.[1] || content;
-    return jaContent.replace(/<[^>]+>/g, '').trim();
-  },
+export const checkAllUrls = async (): Promise<void> => {
+  for (const url of URLS) {
+    try {
+      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      const content = response.getContentText();
+      const { changed, analysis } = await compareContent(url, content);
 
-  'https://github.blog/changelog/label/copilot/': content =>
-    (content.match(/<article[\s\S]*?<\/article>/g) || []).join('\n\n'),
-
-  'https://github.com/RooVetGit/Roo-Code/releases': content =>
-    (content.match(/<div class="release[\s\S]*?<\/div>/g) || [])
-      .map(release => release.replace(/<[^>]+>/g, '').trim())
-      .join('\n\n'),
-
-  'https://github.com/cline/cline/releases': content =>
-    (content.match(/<div class="release[\s\S]*?<\/div>/g) || [])
-      .map(release => release.replace(/<[^>]+>/g, '').trim())
-      .join('\n\n'),
-};
-
-// メイン処理
-const checkUrl = (url: string): void => {
-  try {
-    const content = fetchContent(url);
-    const parsed = parsers[url]?.(content) || content;
-    const hasChanges = compareContent(url, parsed);
-
-    if (hasChanges) {
-      sendNotification(url, parsed);
+      if (changed && analysis) {
+        sendNotification(url, content, analysis);
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(
+          `URLチェック失敗: ${url}. エラー内容: ${error.message}. 解決方法: URLが正しいか、ネットワーク接続を確認してください。`
+        );
+      } else {
+        console.error(`URLチェック失敗: ${url}. 未知のエラーが発生しました。`);
+      }
     }
-  } catch (error) {
-    console.error(`URLチェック失敗: ${url}`, error);
   }
-};
-
-// 一括チェック
-export const checkAllUrls = (): void => {
-  Object.keys(parsers).forEach(checkUrl);
 };
