@@ -36,10 +36,7 @@ export const calculateHash = (content: string): string => {
   return digest.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// Gemini APIで解析
-export const analyzeWithGemini = async (
-  newContent: string
-): Promise<string> => {
+export const extractUpdateDate = async (url: string): Promise<string> => {
   try {
     const apiKey =
       PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
@@ -47,7 +44,29 @@ export const analyzeWithGemini = async (
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
-      contents: `以下から新しい情報を取得してください:\n\n${newContent}`,
+      contents: `
+      Extract only the most recent date and time from the changelog entries at the following URL:${url}
+
+      Provide the output in a clean, machine-readable format (e.g., \`YYYY-MM-DD HH:MM:SS\` or ISO 8601). Exclude all other text, labels, or metadata. If no timestamps are found, return "No dates detected."`,
+    });
+    return response.text || '解析できませんでした';
+  } catch (e) {
+    console.error('Gemini API解析エラー:', e);
+    return `解析エラー: ${(e as Error).message}`;
+  }
+};
+
+export const extractUpdateContent = async (url: string): Promise<string> => {
+  try {
+    const apiKey =
+      PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+    if (!apiKey) throw new Error('GEMINI_API_KEYが設定されていません');
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: `
+      Extract the most recent changelog entry from the following URL: ${url}
+      Provide the output in a clean, machine-readable format. Exclude all other text, labels, or metadata. If no changelog entries are found, return "No changelog entries detected."`,
     });
     return response.text || '解析できませんでした';
   } catch (e) {
@@ -57,40 +76,38 @@ export const analyzeWithGemini = async (
 };
 
 // 変更比較
-export const compareContent = async (
+export const checkChanged = async (
   name: string,
-  url: string,
-  newContent: string
-): Promise<{ changed: boolean; analysis?: string }> => {
+  url: string
+): Promise<boolean> => {
   const props = PropertiesService.getScriptProperties();
-  const hashKey = `last_hash_${name}`;
+  const key = `last_date_${name}`;
 
-  const newHash = calculateHash(newContent);
-  const lastHash = props.getProperty(hashKey);
+  const lastDate = props.getProperty(key);
+  const newDate = await extractUpdateDate(url);
 
-  if (lastHash !== newHash) {
-    props.setProperty(hashKey, newHash);
+  if (lastDate !== newDate) {
+    props.setProperty(key, newDate);
 
-    if (lastHash) {
-      const analysis = await analyzeWithGemini(newContent);
-      return { changed: true, analysis };
+    if (lastDate) {
+      return true;
     }
-    return { changed: false };
+    return false;
   }
-  return { changed: false };
+  return false;
 };
 
 // 通知送信
-export const sendNotification = (
+export const sendNotification = async (
   name: string,
-  url: string,
-  analysis: string
-): void => {
+  url: string
+): Promise<void> => {
   const email =
     PropertiesService.getScriptProperties().getProperty('EMAIL_RECIPIENT');
   if (!email) {
     throw new Error('EMAIL_RECIPIENTが設定されていません');
   }
+  const content = await extractUpdateContent(url);
   MailApp.sendEmail({
     to: email,
     subject: `更新検出: ${name}`,
@@ -98,7 +115,7 @@ export const sendNotification = (
       <h2>更新が検出されました</h2>
       <p><strong>URL:</strong> ${url}</p>
       <h3>変更分析:</h3>
-      <p>${analysis.replace(/\n/g, '<br>')}</p>
+      <p>${content.replace(/\n/g, '<br>')}</p>
       <h3>詳細:</h3>
     `,
   });
@@ -109,12 +126,9 @@ export const checkAllUrls = async (): Promise<void> => {
     const url = service.url;
     const name = service.name;
     try {
-      const response = UrlFetchApp.fetch(url);
-      const content = response.getContentText();
-      const { changed, analysis } = await compareContent(name, url, content);
-
-      if (changed && analysis) {
-        sendNotification(name, url, analysis);
+      const changed = await checkChanged(name, url);
+      if (changed) {
+        await sendNotification(name, url);
       }
     } catch (error) {
       if (error instanceof Error) {
