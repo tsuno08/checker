@@ -121,36 +121,38 @@ export const checkChanged = async (
 
 // 通知送信
 export const sendNotification = async (
-  name: string,
-  url: string
+  changedServices: {
+    name: string;
+    url: string;
+}[]
 ): Promise<void> => {
   const email =
     PropertiesService.getScriptProperties().getProperty('EMAIL_RECIPIENT');
   if (!email) {
     throw new Error('EMAIL_RECIPIENTが設定されていません');
   }
-  const content = await extractUpdateContent(url);
+  let htmlBody = '';
+  for (const service of changedServices) {
+    const url = service.url;
+    const content = await extractUpdateContent(url);
+    htmlBody += `<h3>${service.name}</h3><p>${content}</p>`;
+  }
   MailApp.sendEmail({
     to: email,
-    subject: `更新検出: ${name}`,
-    htmlBody: `
-      <h2>更新が検出されました</h2>
-      <p><strong>URL:</strong> ${url}</p>
-      <h3>変更分析:</h3>
-      <p>${content.replace(/\n/g, '<br>')}</p>
-      <h3>詳細:</h3>
-    `,
+    subject: `更新検出: ${changedServices.map(service => service.name).join(', ')}`,
+    htmlBody,
   });
 };
 
 export const checkAllUrls = async (): Promise<void> => {
+  const changedServices = [];
   for (const service of SERVICES) {
     const url = service.url;
     const name = service.name;
     try {
       const changed = await checkChanged(name, url);
       if (changed) {
-        await sendNotification(name, url);
+        changedServices.push(service);
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -162,4 +164,5 @@ export const checkAllUrls = async (): Promise<void> => {
       }
     }
   }
+  await sendNotification(changedServices);
 };
