@@ -13,8 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { GoogleGenAI } from '@google/genai';
-
 const SERVICES = [
   { name: 'windsurf', url: 'https://windsurf.com/changelog' },
   { name: 'cursor', url: 'https://www.cursor.com/ja/changelog' },
@@ -41,15 +39,26 @@ export const extractUpdateDate = async (url: string): Promise<string> => {
     const apiKey =
       PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
     if (!apiKey) throw new Error('GEMINI_API_KEYが設定されていません');
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: `
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const res = UrlFetchApp.fetch(apiUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `
       Extract only the most recent date and time from the changelog entries at the following URL:${url}
 
       Provide the output in a clean, machine-readable format (e.g., \`YYYY-MM-DD HH:MM:SS\` or ISO 8601). Exclude all other text, labels, or metadata. If no timestamps are found, return "No dates detected."`,
+              },
+            ],
+          },
+        ],
+      }),
     });
-    return response.text || '解析できませんでした';
+    return res.getContentText() || '解析できませんでした';
   } catch (e) {
     console.error('Gemini API解析エラー:', e);
     return `解析エラー: ${(e as Error).message}`;
@@ -61,14 +70,25 @@ export const extractUpdateContent = async (url: string): Promise<string> => {
     const apiKey =
       PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
     if (!apiKey) throw new Error('GEMINI_API_KEYが設定されていません');
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: `
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const res = UrlFetchApp.fetch(apiUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `
       Extract the most recent changelog entry from the following URL: ${url}
       Provide the output in a clean, machine-readable format. Exclude all other text, labels, or metadata. If no changelog entries are found, return "No changelog entries detected."`,
+              },
+            ],
+          },
+        ],
+      }),
     });
-    return response.text || '解析できませんでした';
+    return res.getContentText() || '解析できませんでした';
   } catch (e) {
     console.error('Gemini API解析エラー:', e);
     return `解析エラー: ${(e as Error).message}`;
