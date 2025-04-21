@@ -16,8 +16,8 @@
 import { checkAllUrls } from './url-checker';
 
 // 手動実行用
-export const manualCheck = (): void => {
-  checkAllUrls();
+export const manualCheck = async (): Promise<void> => {
+  await checkAllUrls();
 };
 
 // スケジュール設定
@@ -32,6 +32,6 @@ export const setupTrigger = (): void => {
 };
 
 // スケジュール実行用
-export const scheduledCheck = (): void => {
-  checkAllUrls();
+export const scheduledCheck = async (): Promise<void> => {
+  await checkAllUrls();
 };
