@@ -78,7 +78,7 @@ If no date is found, the output must be exactly: \`No dates detected.\`
   }
 };
 
-export const extractUpdateContent = async (url: string): Promise<string> => {
+export const extractUpdateURL = async (url: string): Promise<string> => {
   try {
     const apiKey =
       PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
@@ -95,19 +95,13 @@ export const extractUpdateContent = async (url: string): Promise<string> => {
                 text: `
 Go to the URL: \`${url}\`
 
-Identify the single, **most recent** changelog entry listed on that page. Extract the key information from this entry, including (if available):
-* The title or main heading of the entry.
-* The primary content or summary describing the change.
-* The publication date associated with the entry.
+Identify the single, **most recent** changelog entry listed on that page. Extract the **direct URL** for that specific entry.
 
-Based **only** on the extracted information from that single most recent entry, **generate a clean and readable HTML block** to display this information clearly ("わかりやすく表示").
+**Your output MUST be ONLY the URL string.**
 
-* Use appropriate HTML tags for structure and readability (e.g., \`<h2>\`/\`<h3>\` for title, \`<p>\` for content, \`<strong>\` or \`<time>\` for the date).
-* Ensure the generated HTML focuses solely on presenting the information from the most recent entry.
+* Do NOT include any introductory text, explanations, labels, formatting, or any other characters besides the URL itself.
 
-**Your response MUST be ONLY the generated HTML block.** Do not include any introductory text, explanations, comments, or any text outside of the main HTML block you generate.
-
-If you cannot find any changelog entries or cannot extract the necessary information to present, your entire output must be exactly this HTML snippet: \`<p>No changelog entries detected.</p>\`
+If you cannot find or extract the URL for the most recent entry, your entire output must be the exact literal string: \`No URL found.\`
 `,
               },
             ],
@@ -165,7 +159,7 @@ export const sendNotification = async (
   let htmlBody = '';
   for (const service of changedServices) {
     const url = service.url;
-    const content = await extractUpdateContent(url);
+    const content = await extractUpdateURL(url);
     htmlBody += `<h3>${service.name}</h3><p>${content}</p>`;
   }
   MailApp.sendEmail({
