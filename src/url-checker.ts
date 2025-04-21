@@ -49,11 +49,23 @@ export const extractUpdateDate = async (url: string): Promise<string> => {
             parts: [
               {
                 text: `
-      Extract only the most recent date and time from the changelog entries at the following URL:${url}
+Analyze the content at \`${url}\`. Find the date and time of the absolute latest changelog entry.
 
-      Provide the output in a clean, machine-readable format (e.g., \`YYYY-MM-DD HH:MM:SS\` or ISO 8601). Exclude all other text, labels, or metadata. If no timestamps are found, return "No dates detected."`,
+Format the result as follows:
+- If time is available: \`YYYY-MM-DD HH:MM:SS\`
+- If time is NOT available: \`YYYY-MM-DD\`
+
+**Output ONLY the formatted string.** No surrounding text, no explanations.
+
+If no date is found, the output must be exactly: \`No dates detected.\`
+`,
               },
             ],
+          },
+        ],
+        tools: [
+          {
+            google_search: {},
           },
         ],
       }),
@@ -81,10 +93,29 @@ export const extractUpdateContent = async (url: string): Promise<string> => {
             parts: [
               {
                 text: `
-      Extract the most recent changelog entry from the following URL: ${url}
-      Provide the output in a clean, machine-readable format. Exclude all other text, labels, or metadata. If no changelog entries are found, return "No changelog entries detected."`,
+Go to the URL: \`${url}\`
+
+Identify the single, **most recent** changelog entry listed on that page. Extract the key information from this entry, including (if available):
+* The title or main heading of the entry.
+* The primary content or summary describing the change.
+* The publication date associated with the entry.
+
+Based **only** on the extracted information from that single most recent entry, **generate a clean and readable HTML block** to display this information clearly ("わかりやすく表示").
+
+* Use appropriate HTML tags for structure and readability (e.g., \`<h2>\`/\`<h3>\` for title, \`<p>\` for content, \`<strong>\` or \`<time>\` for the date).
+* Ensure the generated HTML focuses solely on presenting the information from the most recent entry.
+
+**Your response MUST be ONLY the generated HTML block.** Do not include any introductory text, explanations, comments, or any text outside of the main HTML block you generate.
+
+If you cannot find any changelog entries or cannot extract the necessary information to present, your entire output must be exactly this HTML snippet: \`<p>No changelog entries detected.</p>\`
+`,
               },
             ],
+          },
+        ],
+        tools: [
+          {
+            google_search: {},
           },
         ],
       }),
@@ -124,7 +155,7 @@ export const sendNotification = async (
   changedServices: {
     name: string;
     url: string;
-}[]
+  }[]
 ): Promise<void> => {
   const email =
     PropertiesService.getScriptProperties().getProperty('EMAIL_RECIPIENT');
