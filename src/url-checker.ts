@@ -58,7 +58,8 @@ export const extractUpdateDate = async (url: string): Promise<string> => {
         ],
       }),
     });
-    return res.getContentText() || '解析できませんでした';
+    const json = JSON.parse(res.getContentText());
+    return json.candidates[0].content.parts[0].text || '解析できませんでした';
   } catch (e) {
     console.error('Gemini API解析エラー:', e);
     return `解析エラー: ${(e as Error).message}`;
@@ -88,7 +89,8 @@ export const extractUpdateContent = async (url: string): Promise<string> => {
         ],
       }),
     });
-    return res.getContentText() || '解析できませんでした';
+    const json = JSON.parse(res.getContentText());
+    return json.candidates[0].content.parts[0].text || '解析できませんでした';
   } catch (e) {
     console.error('Gemini API解析エラー:', e);
     return `解析エラー: ${(e as Error).message}`;
