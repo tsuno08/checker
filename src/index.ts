@@ -28,7 +28,7 @@ const setupTrigger = (): void => {
     .forEach(trigger => ScriptApp.deleteTrigger(trigger));
 
   // 毎日午前9時に実行
-  ScriptApp.newTrigger('scheduledCheck').timeBased().everyHours(1).create();
+  ScriptApp.newTrigger('scheduledCheck').timeBased().everyDays(1).atHour(9).create();
 };
 
 // スケジュール実行用
