@@ -15,6 +15,14 @@
  */
 import { GoogleGenAI } from '@google/genai';
 
+const SERVICES = [
+  { name: 'windsurf', url: 'https://windsurf.com/changelog' },
+  { name: 'cursor', url: 'https://www.cursor.com/ja/changelog' },
+  { name: 'GitHub Copilot', url: 'https://github.blog/changelog/label/copilot/' },
+  { name: 'Roo Code', url: 'https://github.com/RooVetGit/Roo-Code/releases' },
+  { name: 'Cline', url: 'https://github.com/cline/cline/releases' },
+];
+
 // ハッシュ計算
 export const calculateHash = (content: string): string => {
   const digest = Utilities.computeDigest(
@@ -27,7 +35,6 @@ export const calculateHash = (content: string): string => {
 
 // Gemini APIで解析
 export const analyzeWithGemini = async (
-  oldContent: string,
   newContent: string
 ): Promise<string> => {
   try {
@@ -37,7 +44,7 @@ export const analyzeWithGemini = async (
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
-      contents: `以下の差分を日本語で簡潔に要約してください:\n\n### 変更前${oldContent}\n\n### 変更後${newContent}`,
+      contents: `以下から新しい情報を取得してください:\n\n${newContent}`,
     });
     return response.text || '解析できませんでした';
   } catch (e) {
@@ -48,23 +55,21 @@ export const analyzeWithGemini = async (
 
 // 変更比較
 export const compareContent = async (
+  name: string,
   url: string,
   newContent: string
 ): Promise<{ changed: boolean; analysis?: string }> => {
   const props = PropertiesService.getScriptProperties();
-  const hashKey = `last_hash_${encodeURIComponent(url)}`;
-  const contentKey = `last_content_${encodeURIComponent(url)}`;
+  const hashKey = `last_hash_${name}`;
 
   const newHash = calculateHash(newContent);
   const lastHash = props.getProperty(hashKey);
-  const lastContent = props.getProperty(contentKey);
 
   if (lastHash !== newHash) {
     props.setProperty(hashKey, newHash);
-    props.setProperty(contentKey, newContent);
 
     if (lastHash) {
-      const analysis = await analyzeWithGemini(lastContent || '', newContent);
+      const analysis = await analyzeWithGemini( newContent);
       return { changed: true, analysis };
     }
     return { changed: false };
@@ -74,6 +79,7 @@ export const compareContent = async (
 
 // 通知送信
 export const sendNotification = (
+  name: string,
   url: string,
   changes: string,
   analysis: string
@@ -85,7 +91,7 @@ export const sendNotification = (
   }
   MailApp.sendEmail({
     to: email,
-    subject: `更新検出: ${url}`,
+    subject: `更新検出: ${name}`,
     htmlBody: `
       <h2>更新が検出されました</h2>
       <p><strong>URL:</strong> ${url}</p>
@@ -97,31 +103,25 @@ export const sendNotification = (
   });
 };
 
-const URLS = [
-  'https://windsurf.com/changelog',
-  'https://www.cursor.com/ja/changelog',
-  'https://github.blog/changelog/label/copilot/',
-  'https://github.com/RooVetGit/Roo-Code/releases',
-  'https://github.com/cline/cline/releases',
-];
-
 export const checkAllUrls = async (): Promise<void> => {
-  for (const url of URLS) {
+  for (const service of SERVICES) {
+    const url = service.url;
+    const name = service.name;
     try {
       const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
       const content = response.getContentText();
-      const { changed, analysis } = await compareContent(url, content);
+      const { changed, analysis } = await compareContent(name, url, content);
 
       if (changed && analysis) {
-        sendNotification(url, content, analysis);
+        sendNotification(name, url, content, analysis);
       }
     } catch (error) {
       if (error instanceof Error) {
         console.error(
-          `URLチェック失敗: ${url}. エラー内容: ${error.message}. 解決方法: URLが正しいか、ネットワーク接続を確認してください。`
+          `チェック失敗: ${name}. エラー内容: ${error.message}. 解決方法: URLが正しいか、ネットワーク接続を確認してください。`
         );
       } else {
-        console.error(`URLチェック失敗: ${url}. 未知のエラーが発生しました。`);
+        console.error(`チェック失敗: ${name}. 未知のエラーが発生しました。`);
       }
     }
   }
