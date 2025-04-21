@@ -24,16 +24,6 @@ const SERVICES = [
   { name: 'Cline', url: 'https://github.com/cline/cline/releases' },
 ];
 
-// ハッシュ計算
-export const calculateHash = (content: string): string => {
-  const digest = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    content,
-    Utilities.Charset.UTF_8
-  );
-  return digest.map(b => b.toString(16).padStart(2, '0')).join('');
-};
-
 export const extractUpdateDate = async (url: string): Promise<string> => {
   try {
     const apiKey =
