@@ -17,6 +17,7 @@ import cleanup from 'rollup-plugin-cleanup';
 import license from 'rollup-plugin-license';
 import prettier from 'rollup-plugin-prettier';
 import typescript from 'rollup-plugin-typescript2';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
 import { fileURLToPath } from 'url';
 
 export default {
@@ -36,6 +37,7 @@ export default {
     }),
     typescript(),
     prettier({ parser: 'typescript' }),
+    nodeResolve(),
   ],
   context: 'this',
 };
