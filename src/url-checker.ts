@@ -16,7 +16,7 @@
 import { GoogleGenAI } from '@google/genai';
 
 // ハッシュ計算
-const calculateHash = (content: string): string => {
+export const calculateHash = (content: string): string => {
   const digest = Utilities.computeDigest(
     Utilities.DigestAlgorithm.SHA_256,
     content,
@@ -26,7 +26,7 @@ const calculateHash = (content: string): string => {
 };
 
 // Gemini APIで解析
-const analyzeWithGemini = async (
+export const analyzeWithGemini = async (
   oldContent: string,
   newContent: string
 ): Promise<string> => {
@@ -47,7 +47,7 @@ const analyzeWithGemini = async (
 };
 
 // 変更比較
-const compareContent = async (
+export const compareContent = async (
   url: string,
   newContent: string
 ): Promise<{ changed: boolean; analysis?: string }> => {
@@ -73,7 +73,7 @@ const compareContent = async (
 };
 
 // 通知送信
-const sendNotification = (
+export const sendNotification = (
   url: string,
   changes: string,
   analysis: string

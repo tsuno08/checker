@@ -16,12 +16,12 @@
 import { checkAllUrls } from './url-checker';
 
 // 手動実行用
-export const manualCheck = async (): Promise<void> => {
+const manualCheck = async (): Promise<void> => {
   await checkAllUrls();
 };
 
 // スケジュール設定
-export const setupTrigger = (): void => {
+const setupTrigger = (): void => {
   // 既存トリガー削除
   ScriptApp.getProjectTriggers()
     .filter(trigger => trigger.getHandlerFunction() === 'scheduledCheck')
@@ -32,6 +32,6 @@ export const setupTrigger = (): void => {
 };
 
 // スケジュール実行用
-export const scheduledCheck = async (): Promise<void> => {
+const scheduledCheck = async (): Promise<void> => {
   await checkAllUrls();
 };
