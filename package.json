@@ -41,8 +41,5 @@
     "rollup-plugin-typescript2": "^0.36.0",
     "ts-jest": "^29.3.2",
     "typescript": "^5.8.3"
-  },
-  "devDependencies": {
-    "@rollup/plugin-node-resolve": "^16.0.1"
   }
 }
