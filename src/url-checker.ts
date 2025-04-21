@@ -18,7 +18,10 @@ import { GoogleGenAI } from '@google/genai';
 const SERVICES = [
   { name: 'windsurf', url: 'https://windsurf.com/changelog' },
   { name: 'cursor', url: 'https://www.cursor.com/ja/changelog' },
-  { name: 'GitHub Copilot', url: 'https://github.blog/changelog/label/copilot/' },
+  {
+    name: 'GitHub Copilot',
+    url: 'https://github.blog/changelog/label/copilot/',
+  },
   { name: 'Roo Code', url: 'https://github.com/RooVetGit/Roo-Code/releases' },
   { name: 'Cline', url: 'https://github.com/cline/cline/releases' },
 ];
@@ -69,7 +72,7 @@ export const compareContent = async (
     props.setProperty(hashKey, newHash);
 
     if (lastHash) {
-      const analysis = await analyzeWithGemini( newContent);
+      const analysis = await analyzeWithGemini(newContent);
       return { changed: true, analysis };
     }
     return { changed: false };
@@ -81,7 +84,6 @@ export const compareContent = async (
 export const sendNotification = (
   name: string,
   url: string,
-  changes: string,
   analysis: string
 ): void => {
   const email =
@@ -98,7 +100,6 @@ export const sendNotification = (
       <h3>変更分析:</h3>
       <p>${analysis.replace(/\n/g, '<br>')}</p>
       <h3>詳細:</h3>
-      <div style="white-space: pre-wrap">${changes}</div>
     `,
   });
 };
@@ -108,12 +109,12 @@ export const checkAllUrls = async (): Promise<void> => {
     const url = service.url;
     const name = service.name;
     try {
-      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      const response = UrlFetchApp.fetch(url);
       const content = response.getContentText();
       const { changed, analysis } = await compareContent(name, url, content);
 
       if (changed && analysis) {
-        sendNotification(name, url, content, analysis);
+        sendNotification(name, url, analysis);
       }
     } catch (error) {
       if (error instanceof Error) {
